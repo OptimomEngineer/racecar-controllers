@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   roscpp
   sensor_msgs
-  ackermann_msgs
+  gigatron_hardware
   visualization_msgs
 )
 
@@ -26,7 +26,7 @@ catkin_package(
     dynamic_reconfigure
     roscpp
     sensor_msgs
-    ackermann_msgs
+    gigatron_hardware
     visualization_msgs
   DEPENDS Eigen
 )
@@ -35,6 +35,7 @@ catkin_package(
 ## Build ##
 ###########
 
+add_definitions(-std=c++11)
 include_directories(
   include
   ${Boost_INCLUDE_DIRS}

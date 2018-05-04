@@ -25,27 +25,27 @@ visualization_msgs::Marker text(visualization_msgs::Marker viz, double x, double
 
 Controller::Controller(ros::NodeHandle nh,
 		       ros::NodeHandle private_nh) :
-  force_scale_x_(0.07), force_scale_y_(0.07), force_offset_x_(100), force_offset_y_(0),
-  speed_p_gain_(0.05), steering_p_gain_(1.0), steering_d_gain_(0.1), viz_forces_scale_(0.07),
+  force_scale_x_(20.5), force_scale_y_(10), force_offset_x_(1000), force_offset_y_(500),
+  speed_p_gain_(0.05), steering_p_gain_(0.6), steering_d_gain_(0.1), viz_forces_scale_(0.07),
   viz_net_force_scale_(0.014), force_angle_last_(0.0)
 {
   // dynamic parameters
   dynamic_param_server_.setCallback(boost::bind(&Controller::paramCallback, this, _1, _2));
 
   // create velocity publisher
-  vel_pub_ = nh.advertise<ackermann_msgs::AckermannDriveStamped>("navigation", 10);
+  vel_pub_ = nh.advertise<gigatron_hardware::MotorCommand>("navigation", 10);
   viz_pub_ = nh.advertise<visualization_msgs::MarkerArray>("/visualization_marker_array", 10);
 
   // subscribe to laser scanner
   scan_sub_ = nh.subscribe("/scan", 10, &Controller::scanCallback, this);
 
   // create a 40Hz timer for setting commands
-  timer_ = nh.createTimer(ros::Duration(1.0/40.0), &Controller::timerCallback, this);
+  timer_ = nh.createTimer(ros::Duration(1.0/10.0), &Controller::timerCallback, this);
 }
 
 void Controller::paramCallback(RacecarPotentialFieldControllerConfig& cfg, uint32_t level)
 {
-  ROS_INFO("racecar_potential_field_controller reconfigure request");
+  ROS_INFO("racecar_potential_field_controller reconfigure request. scalex: %f", cfg.force_scale_x);
   force_scale_x_ = cfg.force_scale_x;
   force_scale_y_ = cfg.force_scale_y;
   force_offset_x_ = cfg.force_offset_x;
@@ -60,17 +60,17 @@ void Controller::paramCallback(RacecarPotentialFieldControllerConfig& cfg, uint3
 void Controller::timerCallback(const ros::TimerEvent& event)
 {
   static bool updating(false);
-  ackermann_msgs::AckermannDriveStamped::Ptr cmd(new ackermann_msgs::AckermannDriveStamped);
+  gigatron_hardware::MotorCommand::Ptr cmd(new gigatron_hardware::MotorCommand);
 
   if (ros::Time::now() - last_cmd_.header.stamp > ros::Duration(0.1)) {
     if (updating) {
-      ROS_WARN("racecar_potential_field_controller not updating navigation command");
+      //ROS_WARN("racecar_potential_field_controller not updating navigation command");
       updating = false;
     }
     return;
   }
   else if (!updating) {
-    ROS_INFO("racecar_potential_field_controller updating navigation command");
+    //ROS_INFO("racecar_potential_field_controller updating navigation command");
     updating = true;
   }
 
@@ -99,7 +99,7 @@ void Controller::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   assert(ranges.size() == angles.size());
 
   // compute "force" from points
-  Eigen::ArrayXf neg_ranges_2(-1*ranges.square());
+  Eigen::ArrayXf neg_ranges_2(-1.0 * ranges.square());
   Eigen::ArrayXf angles_cos(angles.cos());
   Eigen::ArrayXf angles_sin(angles.sin());
   Eigen::ArrayXf forces_x(angles_cos/neg_ranges_2);
@@ -114,12 +114,16 @@ void Controller::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     force_angle = (force_angle < 0 ? -1.0 : 1.0) * 0.5;
   }
   last_cmd_.header.stamp = scan->header.stamp;
-  last_cmd_.drive.speed = speed_p_gain_ * sqrt(net_force_x*net_force_x + net_force_y*net_force_y);
+  double velocity = speed_p_gain_ * net_force_x;
   if (net_force_x < 0)
-    last_cmd_.drive.speed *= -1;
-  last_cmd_.drive.steering_angle = steering_p_gain_ * force_angle +
-    steering_d_gain_ * (force_angle - force_angle_last_);
+      velocity = 0;
+  double rpm = velocity / (2*M_PI*0.127) * 60.0; // 5in radius wheels
+  last_cmd_.rpm_left = (int)rpm;
+  last_cmd_.rpm_right = (int)rpm;
 
+  double steering_radians = steering_p_gain_ * force_angle +
+    steering_d_gain_ * (force_angle - force_angle_last_);
+  last_cmd_.angle_command =  (unsigned int)((steering_radians / 0.5f * 255.0f) + 127.0f);
   // set force_angle_last_ for use in derivative term on next iteration
   // (note: there are better approximations for derivative)
   force_angle_last_ = force_angle;
@@ -127,19 +131,23 @@ void Controller::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   // visualization of "forces"
   visualization_msgs::MarkerArray::Ptr viz(new visualization_msgs::MarkerArray);
   if (fabs(viz_net_force_scale_) > 0) {
-    viz->markers.push_back(arrow(marker("laser", "net_force", 0),
+    viz->markers.push_back(arrow(marker("laser_frame", "net_force", 0),
                                  net_force_x * viz_net_force_scale_,
                                  net_force_y * viz_net_force_scale_));
   }
   if (fabs(viz_forces_scale_) > 0) {
-    viz->markers.push_back(lines(marker("laser", "forces", 0), 12,
+//    forces_x = forces_x.unaryExpr([](float v) { return std::isfinite(v)? v : 0.0; }).cast<float>();
+//    forces_y = forces_y.unaryExpr([](float v) { return std::isfinite(v)? v : 0.0; }).cast<float>();
+
+
+    viz->markers.push_back(lines(marker("laser_frame", "forces", 0), 1,
                                  points_x, points_y,
                                  forces_x * viz_forces_scale_,
                                  forces_y * viz_forces_scale_));
   }
   std::ostringstream status;
-  status << std::setprecision(2) << "Speed: " << last_cmd_.drive.speed << std::setprecision(3) << "\nSteering: " << last_cmd_.drive.steering_angle;
-  viz->markers.push_back(text(marker("base_link", "status", 0), -0.5, 0, status.str()));
+  status << std::setprecision(2) << "Speed: " << last_cmd_.rpm_left << std::setprecision(3) << "\nVel: " << velocity << "\nStr: " << (int)last_cmd_.angle_command << "\nAngle: " << steering_radians;
+  viz->markers.push_back(text(marker("laser_frame", "status", 0), -0.5, 0, status.str()));
   viz_pub_.publish(viz);
 }
 
@@ -154,7 +162,7 @@ visualization_msgs::Marker marker(const std::string& frame_id, const std::string
   viz.action = 0;
   viz.pose.orientation.w = 1;
   viz.color.a = 1;
-  viz.lifetime = ros::Duration(0.1);
+//  viz.lifetime = ros::Duration(0.1);
   viz.frame_locked = true;
   viz.points.clear();
   viz.colors.clear();
@@ -200,13 +208,15 @@ visualization_msgs::Marker lines(visualization_msgs::Marker viz, int skip,
   viz.points.reserve(points_x.size() / skip * 2);
 
   for (int i = 0; i < points_x.size(); i += skip) {
-    visualization_msgs::Marker::_points_type::value_type origin, end;
-    origin.x = points_x(i);
-    origin.y = points_y(i);
-    end.x = points_x(i) + forces_x(i);
-    end.y = points_y(i) + forces_y(i);
-    viz.points.push_back(origin);
-    viz.points.push_back(end);
+    if(std::isfinite(points_x(i)) && std::isfinite(points_y(i))) {
+      visualization_msgs::Marker::_points_type::value_type origin, end;
+      origin.x = points_x(i);
+      origin.y = points_y(i);
+      end.x = points_x(i) + forces_x(i);
+      end.y = points_y(i) + forces_y(i);
+      viz.points.push_back(origin);
+      viz.points.push_back(end);
+    }
   }
 
   return viz;

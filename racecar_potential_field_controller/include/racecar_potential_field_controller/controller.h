@@ -7,7 +7,9 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/LaserScan.h>
-#include <ackermann_msgs/AckermannDriveStamped.h>
+#include <gigatron_hardware/MotorCommand.h>
+#include <gigatron_hardware/Motors.h>
+#include <gigatron_hardware/Steering.h>
 #include <dynamic_reconfigure/server.h>
 
 #include "racecar_potential_field_controller/RacecarPotentialFieldControllerConfig.h"
@@ -35,7 +37,7 @@ private:
   double viz_net_force_scale_;
 
   // state
-  ackermann_msgs::AckermannDriveStamped last_cmd_;
+  gigatron_hardware::MotorCommand last_cmd_;
   double force_angle_last_;
 
   // ROS services
