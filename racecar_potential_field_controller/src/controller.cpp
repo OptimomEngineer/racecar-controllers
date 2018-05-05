@@ -33,7 +33,7 @@ Controller::Controller(ros::NodeHandle nh,
   dynamic_param_server_.setCallback(boost::bind(&Controller::paramCallback, this, _1, _2));
 
   // create velocity publisher
-  vel_pub_ = nh.advertise<gigatron_hardware::MotorCommand>("navigation", 10);
+  vel_pub_ = nh.advertise<gigatron_msgs::MotorCommand>("navigation", 10);
   viz_pub_ = nh.advertise<visualization_msgs::MarkerArray>("/visualization_marker_array", 10);
 
   // subscribe to laser scanner
@@ -60,7 +60,7 @@ void Controller::paramCallback(RacecarPotentialFieldControllerConfig& cfg, uint3
 void Controller::timerCallback(const ros::TimerEvent& event)
 {
   static bool updating(false);
-  gigatron_hardware::MotorCommand::Ptr cmd(new gigatron_hardware::MotorCommand);
+  gigatron_msgs::MotorCommand::Ptr cmd(new gigatron_msgs::MotorCommand);
 
   if (ros::Time::now() - last_cmd_.header.stamp > ros::Duration(0.1)) {
     if (updating) {

@@ -7,9 +7,9 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/LaserScan.h>
-#include <gigatron_hardware/MotorCommand.h>
-#include <gigatron_hardware/Motors.h>
-#include <gigatron_hardware/Steering.h>
+#include <gigatron_msgs/MotorCommand.h>
+#include <gigatron_msgs/Motors.h>
+#include <gigatron_msgs/Steering.h>
 #include <dynamic_reconfigure/server.h>
 
 #include "racecar_potential_field_controller/RacecarPotentialFieldControllerConfig.h"
@@ -37,7 +37,7 @@ private:
   double viz_net_force_scale_;
 
   // state
-  gigatron_hardware::MotorCommand last_cmd_;
+  gigatron_msgs::MotorCommand last_cmd_;
   double force_angle_last_;
 
   // ROS services

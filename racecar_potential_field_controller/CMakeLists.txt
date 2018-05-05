@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   roscpp
   sensor_msgs
-  gigatron_hardware
+  gigatron_msgs
   visualization_msgs
 )
 
@@ -26,7 +26,7 @@ catkin_package(
     dynamic_reconfigure
     roscpp
     sensor_msgs
-    gigatron_hardware
+    gigatron_msgs
     visualization_msgs
   DEPENDS Eigen
 )
