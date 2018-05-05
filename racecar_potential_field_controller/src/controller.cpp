@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cassert>
 #include <sstream>
-
+#include <algorithm>
 #include <Eigen/Dense>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -33,7 +33,7 @@ Controller::Controller(ros::NodeHandle nh,
   dynamic_param_server_.setCallback(boost::bind(&Controller::paramCallback, this, _1, _2));
 
   // create velocity publisher
-  vel_pub_ = nh.advertise<gigatron_msgs::MotorCommand>("navigation", 10);
+  vel_pub_ = nh.advertise<gigatron_msgs::MotorCommand>("/arduino/command/motors", 10);
   viz_pub_ = nh.advertise<visualization_msgs::MarkerArray>("/visualization_marker_array", 10);
 
   // subscribe to laser scanner
@@ -117,13 +117,17 @@ void Controller::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   double velocity = speed_p_gain_ * net_force_x;
   if (net_force_x < 0)
       velocity = 0;
+  velocity = std::min(velocity, 1.5);
   double rpm = velocity / (2*M_PI*0.127) * 60.0; // 5in radius wheels
-  last_cmd_.rpm_left = (int)rpm;
-  last_cmd_.rpm_right = (int)rpm;
+  last_cmd_.rpm_left = -(int)rpm;
+  last_cmd_.rpm_right = -(int)rpm;
 
   double steering_radians = steering_p_gain_ * force_angle +
     steering_d_gain_ * (force_angle - force_angle_last_);
-  last_cmd_.angle_command =  (unsigned int)((steering_radians / 0.5f * 255.0f) + 127.0f);
+  double angle_com = 255.0f - ((steering_radians / 0.5f * 255.0f) + 127.0f);
+  angle_com = std::min(angle_com, 240.0);
+  angle_com = std::max(angle_com, 10.0);
+  last_cmd_.angle_command = (unsigned int)angle_com;
   // set force_angle_last_ for use in derivative term on next iteration
   // (note: there are better approximations for derivative)
   force_angle_last_ = force_angle;
