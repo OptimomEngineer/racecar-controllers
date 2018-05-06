@@ -1,8 +1,8 @@
 force_scale_x: 3.0
 force_scale_y: 0.7
-force_offset_x: 50.0
+force_offset_x: 25
 force_offset_y: 0.0
-speed_p_gain: 0.05
+speed_p_gain: 0.15
 steering_p_gain: 0.8
 steering_d_gain: 0.1
 viz_forces_scale: 0.07
