@@ -117,7 +117,7 @@ void Controller::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   double velocity = speed_p_gain_ * net_force_x;
   if (net_force_x < 0)
       velocity = 0;
-  velocity = std::min(velocity, 3.0);
+  velocity = std::min(velocity, 4.0);
   double rpm = velocity / (2*M_PI*0.127) * 60.0; // 5in radius wheels
   last_cmd_.rpm_left = -(int)rpm;
   last_cmd_.rpm_right = -(int)rpm;
